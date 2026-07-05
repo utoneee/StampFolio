@@ -106,6 +106,19 @@
     z-index: 30; white-space: nowrap;
   }
   .toast.show { opacity: 0.94; }
+
+  .debug-panel {
+    position: fixed; right: 10px; bottom: 10px; z-index: 40;
+    background: rgba(74,63,51,0.92); color: #F2ECE2;
+    border-radius: 10px; padding: 10px 12px; font-size: 12px;
+    display: flex; flex-direction: column; gap: 6px; max-width: 200px;
+  }
+  .debug-row { display: flex; gap: 6px; }
+  .debug-panel button {
+    flex: 1; font-size: 11px; padding: 6px 8px; border-radius: 6px; border: none;
+    background: #B8845A; color: #fff; cursor: pointer;
+  }
+  #debug-clear { background: #96604A; }
 </style>
 </head>
 <body>
@@ -144,6 +157,15 @@
 
   <div id="toast" class="toast"></div>
 
+  <div id="debug-panel" class="debug-panel" hidden>
+    <div id="debug-offset-label">模擬日期偏移：+0 天</div>
+    <div class="debug-row">
+      <button id="debug-day-plus">模擬 +1 天</button>
+      <button id="debug-day-reset">回到今天</button>
+    </div>
+    <button id="debug-clear">清空重置所有資料</button>
+  </div>
+
 <script>
 (function () {
   const THEME_ID = 'daily';
@@ -170,6 +192,11 @@
   function saveState(s) { Store.save(KEYS.state, s); }
 
   // ---------- helpers ----------
+  const DEBUG = new URLSearchParams(location.search).get('debug') === '1';
+  const DEBUG_OFFSET_KEY = 'stampAlbum.v1.debugOffsetDays';
+  function debugOffsetDays() { return Store.load(DEBUG_OFFSET_KEY, 0); }
+  function now() { return new Date(Date.now() + debugOffsetDays() * 86400000); }
+
   function dayKey(dateInput, cutoffHour) {
     const d = new Date(dateInput);
     const shifted = new Date(d.getTime() - (cutoffHour || 0) * 3600 * 1000);
@@ -292,7 +319,7 @@
 
   function maybeDrop() {
     const state = getState();
-    const today = dayKey(new Date(), state.settings.dayCutoffHour);
+    const today = dayKey(now(), state.settings.dayCutoffHour);
     if (state.pendingDrop) return; // 有待選，先不掉新落
     if (state.lastDropDayKey === today) return; // 今天掉過了
     if (state.poolCycle.length === 0) return; // 理論上不會發生（完冊即重建）
@@ -341,7 +368,7 @@
     const records = getRecords();
     const rec = records.find(r => r.book === book && r.slot === slot);
     if (!rec || rec.stampedAt) return;
-    rec.stampedAt = new Date().toISOString();
+    rec.stampedAt = now().toISOString();
     saveRecords(records);
     closeDetailModal();
     render(`${book}-${slot}`);
@@ -496,6 +523,29 @@
   document.getElementById('prev-book').addEventListener('click', () => { if (viewBook > 1) { viewBook--; render(); } });
   document.getElementById('next-book').addEventListener('click', () => { if (viewBook < maxBook()) { viewBook++; render(); } });
 
+  // ---------- debug panel（僅 URL 帶 ?debug=1 時出現，測試用：清空重置／模擬換日） ----------
+  function setupDebugPanel() {
+    if (!DEBUG) return;
+    document.getElementById('debug-panel').hidden = false;
+    document.getElementById('debug-offset-label').textContent = `模擬日期偏移：+${debugOffsetDays()} 天`;
+    document.getElementById('debug-day-plus').addEventListener('click', () => {
+      Store.save(DEBUG_OFFSET_KEY, debugOffsetDays() + 1);
+      location.reload();
+    });
+    document.getElementById('debug-day-reset').addEventListener('click', () => {
+      Store.save(DEBUG_OFFSET_KEY, 0);
+      location.reload();
+    });
+    document.getElementById('debug-clear').addEventListener('click', () => {
+      if (!confirm('清空所有集郵冊資料（挑戰庫／貼票紀錄／狀態／模擬日期），確定？')) return;
+      localStorage.removeItem(KEYS.challenges);
+      localStorage.removeItem(KEYS.records);
+      localStorage.removeItem(KEYS.state);
+      localStorage.removeItem(DEBUG_OFFSET_KEY);
+      location.reload();
+    });
+  }
+
   // ---------- boot ----------
   (async function boot() {
     await loadThemePack();
@@ -503,6 +553,7 @@
     maybeDrop();
     viewBook = getState().book;
     render();
+    setupDebugPanel();
     const state = getState();
     if (viewBook === state.book && state.pendingDrop) openCandidateModal();
   })();
