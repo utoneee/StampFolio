@@ -1,0 +1,25 @@
+{
+  "themeId": "daily",
+  "bookTitle": "StampFolio: Daily",
+  "bookLabelEn": "DAILY STAMP",
+  "colors": {
+    "albumBg": "#F2ECE2",
+    "stampPaper": "#EFE7D8",
+    "artBg": "#E4D9C5",
+    "accent": "#B8845A",
+    "accentDeep": "#8A7357",
+    "ink": "#4A3F33",
+    "markNormal": "#96604A",
+    "markMakeup": "#66748A"
+  },
+  "categories": {
+    "draw": "動筆 — 畫、寫、設計小練習",
+    "look": "觀看 — 觀察、收集、審美輸入",
+    "make": "動手 — 料理、手作、實體製作",
+    "body": "身體 — 移動、休息、感官",
+    "mind": "心神 — 抽牌、整理、反思"
+  },
+  "settings": {
+    "dayCutoffHour": 0
+  }
+}

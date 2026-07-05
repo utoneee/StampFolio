@@ -1,0 +1,26 @@
+<svg viewBox="0 0 220 140" xmlns="http://www.w3.org/2000/svg">
+  <!-- 補票戳 v1：八角框戳 + 虛線消印，灰藍墨。id 為引擎掛動態日期的掛鉤。 -->
+  <defs>
+    <filter id="inkm" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/>
+    </filter>
+  </defs>
+  <g filter="url(#inkm)" stroke="#66748A" fill="none" opacity="0.85">
+    <!-- 八角日戳 -->
+    <polygon points="47,20 93,20 116,43 116,89 93,112 47,112 24,89 24,43" stroke-width="3"/>
+    <polygon points="52,29 88,29 107,48 107,84 88,103 52,103 33,84 33,48" stroke-width="1.2"/>
+    <!-- 虛線消印 -->
+    <g stroke-width="2.6" stroke-linecap="round" stroke-dasharray="9 7">
+      <path d="M 128 46 Q 148 38 168 46 T 208 46"/>
+      <path d="M 130 62 Q 150 54 170 62 T 210 62"/>
+      <path d="M 130 78 Q 150 70 170 78 T 210 78"/>
+      <path d="M 128 94 Q 148 86 168 94 T 208 94"/>
+    </g>
+  </g>
+  <g font-family="Georgia, serif" fill="#66748A" text-anchor="middle" opacity="0.85" filter="url(#inkm)">
+    <text x="70" y="53" font-size="9.5" letter-spacing="2">LATER · 補</text>
+    <text id="pm-makeup-date" x="70" y="72" font-size="13" letter-spacing="1">07.05</text>
+    <text id="pm-makeup-dropped" x="70" y="89" font-size="8.5" letter-spacing="1">掉落於 07.02</text>
+  </g>
+</svg>

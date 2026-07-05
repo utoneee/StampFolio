@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>StampFolio</title>
+<style>
+  :root {
+    --album-bg: #F2ECE2;
+    --stamp-paper: #EFE7D8;
+    --art-bg: #E4D9C5;
+    --accent: #B8845A;
+    --accent-deep: #8A7357;
+    --ink: #4A3F33;
+    --mark-normal: #96604A;
+    --mark-makeup: #66748A;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--album-bg);
+    color: var(--ink);
+    font-family: -apple-system, "Noto Serif TC", serif;
+    min-height: 100%;
+  }
+  header {
+    position: sticky; top: 0; z-index: 5;
+    background: var(--album-bg);
+    padding: env(safe-area-inset-top, 12px) 16px 8px;
+    text-align: center;
+    border-bottom: 1px solid rgba(74,63,51,0.12);
+  }
+  header h1 { font-size: 18px; margin: 4px 0; letter-spacing: 2px; }
+  .book-nav { display: flex; align-items: center; justify-content: center; gap: 14px; font-size: 13px; color: var(--accent-deep); }
+  .book-nav button {
+    background: none; border: 1px solid var(--accent); color: var(--accent-deep);
+    border-radius: 999px; width: 28px; height: 28px; font-size: 14px; line-height: 1;
+    cursor: pointer;
+  }
+  .book-nav button:disabled { opacity: 0.25; cursor: default; }
+
+  .pending-banner {
+    max-width: 720px; margin: 10px auto 0; padding: 10px 16px;
+    background: rgba(184,132,90,0.14); border: 1px solid var(--accent);
+    border-radius: 10px; font-size: 13px; text-align: center; color: var(--ink);
+  }
+
+  .album-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 12px;
+    padding: 16px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .stamp-card { cursor: pointer; position: relative; }
+  .stamp-card svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 2px 3px rgba(74,63,51,0.18)); }
+  .stamp-card.unstamped svg .frame-art { opacity: 0.55; }
+  .stamp-card.just-stamped { animation: stampPop 0.32s ease-out; }
+  @keyframes stampPop {
+    0% { transform: scale(0.94); }
+    55% { transform: scale(1.04); }
+    100% { transform: scale(1); }
+  }
+
+  .empty-note { max-width: 720px; margin: 40px auto; text-align: center; color: var(--accent-deep); font-size: 14px; padding: 0 24px; }
+
+  /* modals */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(74,63,51,0.45);
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px; z-index: 20;
+  }
+  .overlay[hidden] { display: none; }
+  .sheet {
+    background: var(--stamp-paper); border-radius: 16px; padding: 20px;
+    max-width: 420px; width: 100%; max-height: 86vh; overflow-y: auto;
+  }
+  .sheet h2 { margin: 0 0 12px; font-size: 16px; letter-spacing: 1px; }
+  .candidate-list { display: flex; gap: 12px; }
+  .candidate-card {
+    flex: 1; border: 1.5px solid var(--accent); border-radius: 12px; padding: 14px 10px;
+    text-align: center; cursor: pointer; background: rgba(255,255,255,0.35);
+  }
+  .candidate-card:active { background: rgba(184,132,90,0.25); }
+  .candidate-card .cat { font-size: 11px; color: var(--accent-deep); margin-bottom: 6px; }
+  .candidate-card .title { font-size: 15px; margin-bottom: 6px; line-height: 1.4; }
+  .candidate-card .note { font-size: 11px; color: var(--accent-deep); }
+
+  .detail-row { font-size: 13px; margin: 6px 0; color: var(--ink); }
+  .detail-row .label { color: var(--accent-deep); margin-right: 6px; }
+  .stamp-btn {
+    margin-top: 16px; width: 100%; padding: 12px; border: none; border-radius: 10px;
+    background: var(--accent); color: #fff; font-size: 15px; letter-spacing: 2px; cursor: pointer;
+  }
+  .stamp-btn:active { background: var(--accent-deep); }
+  .close-btn {
+    margin-top: 10px; width: 100%; padding: 10px; border: 1px solid var(--accent-deep);
+    background: none; border-radius: 10px; color: var(--accent-deep); font-size: 13px; cursor: pointer;
+  }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%);
+    background: var(--ink); color: var(--stamp-paper); padding: 10px 18px; border-radius: 999px;
+    font-size: 13px; opacity: 0; pointer-events: none; transition: opacity 0.25s;
+    z-index: 30; white-space: nowrap;
+  }
+  .toast.show { opacity: 0.94; }
+</style>
+</head>
+<body>
+  <header>
+    <h1 id="book-title">StampFolio</h1>
+    <div class="book-nav">
+      <button id="prev-book" aria-label="上一本">‹</button>
+      <span id="book-indicator">第 1 本</span>
+      <button id="next-book" aria-label="下一本">›</button>
+    </div>
+  </header>
+
+  <div id="pending-banner" class="pending-banner" hidden></div>
+
+  <div id="album-grid" class="album-grid"></div>
+  <div id="empty-note" class="empty-note" hidden>這本還沒有任何一格，明天開 app 會掉下第一批候選。</div>
+
+  <div id="candidate-overlay" class="overlay" hidden>
+    <div class="sheet">
+      <h2>今天掉下兩張，選一張貼進冊子</h2>
+      <div id="candidate-list" class="candidate-list"></div>
+    </div>
+  </div>
+
+  <div id="detail-overlay" class="overlay" hidden>
+    <div class="sheet">
+      <h2 id="detail-title"></h2>
+      <div class="detail-row"><span class="label">分類</span><span id="detail-cat"></span></div>
+      <div class="detail-row" id="detail-note-row"><span class="label">備註</span><span id="detail-note"></span></div>
+      <div class="detail-row"><span class="label">掉落日</span><span id="detail-dropped"></span></div>
+      <div class="detail-row" id="detail-stamped-row" hidden><span class="label">戳面</span><span id="detail-stamped"></span></div>
+      <button id="stamp-action" class="stamp-btn" hidden>蓋 章</button>
+      <button id="detail-close" class="close-btn">關閉</button>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+<script>
+(function () {
+  const THEME_ID = 'daily';
+  const THEME_BASE = `./themes/${THEME_ID}/`;
+  const KEYS = {
+    challenges: 'stampAlbum.v1.challenges',
+    records: 'stampAlbum.v1.records',
+    state: 'stampAlbum.v1.state'
+  };
+
+  // ---------- storage ----------
+  const Store = {
+    load(key, fallback) {
+      const raw = localStorage.getItem(key);
+      if (raw === null) return fallback;
+      try { return JSON.parse(raw); } catch (e) { return fallback; }
+    },
+    save(key, value) { localStorage.setItem(key, JSON.stringify(value)); }
+  };
+  function getChallenges() { return Store.load(KEYS.challenges, []); }
+  function getRecords() { return Store.load(KEYS.records, []); }
+  function getState() { return Store.load(KEYS.state, null); }
+  function saveRecords(r) { Store.save(KEYS.records, r); }
+  function saveState(s) { Store.save(KEYS.state, s); }
+
+  // ---------- helpers ----------
+  function dayKey(dateInput, cutoffHour) {
+    const d = new Date(dateInput);
+    const shifted = new Date(d.getTime() - (cutoffHour || 0) * 3600 * 1000);
+    const y = shifted.getFullYear();
+    const m = String(shifted.getMonth() + 1).padStart(2, '0');
+    const day = String(shifted.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  function mmdd(dayKeyStr) {
+    const parts = dayKeyStr.split('-');
+    return `${parts[1]}.${parts[2]}`;
+  }
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  function hashStr(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }
+  function deriveType(record) {
+    if (!record.stampedAt) return 'unstamped';
+    const cutoff = getState().settings.dayCutoffHour;
+    return dayKey(record.stampedAt, cutoff) === record.droppedOn ? 'normal' : 'makeup';
+  }
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  // ---------- svg template instantiation ----------
+  // 主題 SVG 契約：mask 用 id="perf"、filter 用 id="inkn" / id="inkm" 供本函式改唯一性；
+  // 內容掛鉤 id（stamp-denom / stamp-title-cn / stamp-title-en / pm-normal-date / pm-normal-year /
+  // pm-makeup-date / pm-makeup-dropped）維持不變，僅在各自卡片子樹內用 querySelector 找。
+  function instantiate(svgText, linkId, suffix) {
+    const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+    const svg = doc.documentElement;
+    if (linkId) {
+      const newId = `${linkId}-${suffix}`;
+      const target = svg.querySelector('#' + linkId);
+      if (target) target.id = newId;
+      svg.querySelectorAll(`[mask="url(#${linkId})"]`).forEach(el => el.setAttribute('mask', `url(#${newId})`));
+      svg.querySelectorAll(`[filter="url(#${linkId})"]`).forEach(el => el.setAttribute('filter', `url(#${newId})`));
+    }
+    return svg;
+  }
+
+  let assets = null; // { theme, challenges, frameSvgText, normalSvgText, makeupSvgText }
+
+  async function loadThemePack() {
+    const [theme, challengeData, frameSvgText, normalSvgText, makeupSvgText] = await Promise.all([
+      fetch(THEME_BASE + 'theme.json').then(r => r.json()),
+      fetch(THEME_BASE + 'challenges.json').then(r => r.json()),
+      fetch(THEME_BASE + 'stamp-frame.svg').then(r => r.text()),
+      fetch(THEME_BASE + 'postmark-normal.svg').then(r => r.text()),
+      fetch(THEME_BASE + 'postmark-makeup.svg').then(r => r.text())
+    ]);
+    assets = { theme, challengeData, frameSvgText, normalSvgText, makeupSvgText };
+    applyThemeColors(theme.colors);
+    document.getElementById('book-title').textContent = theme.bookTitle;
+  }
+
+  function applyThemeColors(colors) {
+    const root = document.documentElement.style;
+    root.setProperty('--album-bg', colors.albumBg);
+    root.setProperty('--stamp-paper', colors.stampPaper);
+    root.setProperty('--art-bg', colors.artBg);
+    root.setProperty('--accent', colors.accent);
+    root.setProperty('--accent-deep', colors.accentDeep);
+    root.setProperty('--ink', colors.ink);
+    root.setProperty('--mark-normal', colors.markNormal);
+    root.setProperty('--mark-makeup', colors.markMakeup);
+  }
+
+  // ---------- seeding ----------
+  function ensureSeed() {
+    if (getChallenges().length === 0) {
+      Store.save(KEYS.challenges, assets.challengeData.challenges);
+    }
+    if (getState() === null) {
+      const ids = shuffle(assets.challengeData.challenges.filter(c => c.active).map(c => c.id));
+      saveState({
+        book: 1,
+        poolCycle: ids,
+        lastDropDayKey: null,
+        pendingDrop: null,
+        settings: { dayCutoffHour: assets.theme.settings.dayCutoffHour }
+      });
+    }
+    if (localStorage.getItem(KEYS.records) === null) saveRecords([]);
+  }
+
+  function activeChallengeMap() {
+    const map = {};
+    getChallenges().forEach(c => { map[c.id] = c; });
+    return map;
+  }
+
+  function nextSlot(book) {
+    return getRecords().filter(r => r.book === book).length + 1;
+  }
+
+  // ---------- drop / choose / stamp / completion ----------
+  function checkBookCompletion(state) {
+    if (state.poolCycle.length === 0 && !state.pendingDrop) {
+      state.book += 1;
+      state.poolCycle = shuffle(getChallenges().filter(c => c.active).map(c => c.id));
+      toast('這本集郵冊完成了，翻開新的一本');
+    }
+    return state;
+  }
+
+  function maybeDrop() {
+    const state = getState();
+    const today = dayKey(new Date(), state.settings.dayCutoffHour);
+    if (state.pendingDrop) return; // 有待選，先不掉新落
+    if (state.lastDropDayKey === today) return; // 今天掉過了
+    if (state.poolCycle.length === 0) return; // 理論上不會發生（完冊即重建）
+
+    if (state.poolCycle.length === 1) {
+      const id = state.poolCycle.pop();
+      const rec = {
+        book: state.book, slot: nextSlot(state.book), challengeId: id,
+        droppedOn: today, stampedAt: null
+      };
+      const records = getRecords(); records.push(rec); saveRecords(records);
+      state.lastDropDayKey = today;
+      checkBookCompletion(state);
+      saveState(state);
+      toast('池裡只剩最後一張，直接貼進本冊最後一格');
+    } else {
+      const idxA = Math.floor(Math.random() * state.poolCycle.length);
+      let idxB = Math.floor(Math.random() * (state.poolCycle.length - 1));
+      if (idxB >= idxA) idxB += 1;
+      const idA = state.poolCycle[idxA], idB = state.poolCycle[idxB];
+      state.poolCycle = state.poolCycle.filter((_, i) => i !== idxA && i !== idxB);
+      state.pendingDrop = { droppedOn: today, ids: [idA, idB] };
+      state.lastDropDayKey = today;
+      saveState(state);
+    }
+  }
+
+  function chooseCandidate(chosenId) {
+    const state = getState();
+    if (!state.pendingDrop) return;
+    const otherId = state.pendingDrop.ids.find(id => id !== chosenId);
+    state.poolCycle.push(otherId);
+    const rec = {
+      book: state.book, slot: nextSlot(state.book), challengeId: chosenId,
+      droppedOn: state.pendingDrop.droppedOn, stampedAt: null
+    };
+    const records = getRecords(); records.push(rec); saveRecords(records);
+    state.pendingDrop = null;
+    checkBookCompletion(state);
+    saveState(state);
+    closeCandidateModal();
+    render();
+  }
+
+  function stampRecord(book, slot) {
+    const records = getRecords();
+    const rec = records.find(r => r.book === book && r.slot === slot);
+    if (!rec || rec.stampedAt) return;
+    rec.stampedAt = new Date().toISOString();
+    saveRecords(records);
+    closeDetailModal();
+    render(`${book}-${slot}`);
+  }
+
+  // ---------- view state ----------
+  let viewBook = 1;
+
+  function maxBook() {
+    const state = getState();
+    const recBooks = getRecords().map(r => r.book);
+    return Math.max(state.book, ...(recBooks.length ? recBooks : [1]));
+  }
+
+  // ---------- rendering ----------
+  function buildFrameSvg(record, challenge, suffix) {
+    const svg = instantiate(assets.frameSvgText, 'perf', suffix);
+    const month = record.droppedOn.split('-')[1];
+    const year = record.droppedOn.split('-')[0];
+    svg.querySelector('#stamp-denom').textContent = month;
+    svg.querySelector('#stamp-title-cn').textContent = challenge.title;
+    svg.querySelector('#stamp-title-en').textContent = `${assets.theme.bookLabelEn} · ${year}`;
+    const art = svg.querySelector('#stamp-art');
+    if (art) art.classList.add('frame-art');
+
+    const type = deriveType(record);
+    if (type !== 'unstamped') {
+      const isNormal = type === 'normal';
+      const linkId = isNormal ? 'inkn' : 'inkm';
+      const svgText = isNormal ? assets.normalSvgText : assets.makeupSvgText;
+      const mark = instantiate(svgText, linkId, suffix);
+      const h = hashStr(challenge.id + '-' + record.slot);
+      const deg = isNormal ? (-15 + (h % 8)) : (6 + (h % 7));
+      const tx = 178 + ((h % 21) - 10);
+      const ty = 226 + (((h >> 4) % 21) - 10);
+      const scale = 0.62;
+      // 將戳的內容節點搬進 frame 這個 svg，套 transform 定位到圖樣區右下象限
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      g.setAttribute('transform', `translate(${tx} ${ty}) rotate(${deg}) scale(${scale}) translate(-70 -70)`);
+      Array.from(mark.childNodes).forEach(node => g.appendChild(node.cloneNode(true)));
+      const stampDate = mmdd(dayKey(record.stampedAt, getState().settings.dayCutoffHour));
+      const stampYear = dayKey(record.stampedAt, getState().settings.dayCutoffHour).split('-')[0];
+      if (isNormal) {
+        const dEl = g.querySelector('#pm-normal-date'); if (dEl) dEl.textContent = stampDate;
+        const yEl = g.querySelector('#pm-normal-year'); if (yEl) yEl.textContent = stampYear;
+      } else {
+        const dEl = g.querySelector('#pm-makeup-date'); if (dEl) dEl.textContent = stampDate;
+        const dropEl = g.querySelector('#pm-makeup-dropped'); if (dropEl) dropEl.textContent = `掉落於 ${mmdd(record.droppedOn)}`;
+      }
+      svg.appendChild(g);
+    }
+    return svg;
+  }
+
+  function render(justStampedKey) {
+    const state = getState();
+    const records = getRecords().filter(r => r.book === viewBook).sort((a, b) => a.slot - b.slot);
+    const challenges = activeChallengeMap();
+
+    document.getElementById('book-indicator').textContent = `第 ${viewBook} 本 / 共 ${maxBook()} 本`;
+    document.getElementById('prev-book').disabled = viewBook <= 1;
+    document.getElementById('next-book').disabled = viewBook >= maxBook();
+
+    const grid = document.getElementById('album-grid');
+    grid.innerHTML = '';
+    document.getElementById('empty-note').hidden = records.length > 0;
+
+    records.forEach(rec => {
+      const challenge = challenges[rec.challengeId];
+      if (!challenge) return;
+      const suffix = `${rec.book}-${rec.slot}`;
+      const svg = buildFrameSvg(rec, challenge, suffix);
+      const card = document.createElement('div');
+      const type = deriveType(rec);
+      card.className = 'stamp-card ' + (type === 'unstamped' ? 'unstamped' : 'stamped');
+      if (justStampedKey === suffix) card.classList.add('just-stamped');
+      card.appendChild(svg);
+      card.addEventListener('click', () => openDetail(rec, challenge));
+      grid.appendChild(card);
+    });
+
+    const banner = document.getElementById('pending-banner');
+    if (viewBook === state.book && state.pendingDrop) {
+      banner.hidden = false;
+      banner.textContent = '今天掉下新的候選，點這裡選一張貼進冊子';
+      banner.onclick = openCandidateModal;
+    } else {
+      banner.hidden = true;
+      banner.onclick = null;
+    }
+  }
+
+  // ---------- candidate modal ----------
+  function openCandidateModal() {
+    const state = getState();
+    if (!state.pendingDrop) return;
+    const challenges = activeChallengeMap();
+    const list = document.getElementById('candidate-list');
+    list.innerHTML = '';
+    state.pendingDrop.ids.forEach(id => {
+      const c = challenges[id];
+      if (!c) return;
+      const card = document.createElement('div');
+      card.className = 'candidate-card';
+      card.innerHTML = `
+        <div class="cat">${assets.theme.categories[c.category] || c.category}</div>
+        <div class="title">${c.title}</div>
+        <div class="note">${c.note || ''}</div>
+      `;
+      card.addEventListener('click', () => chooseCandidate(id));
+      list.appendChild(card);
+    });
+    document.getElementById('candidate-overlay').hidden = false;
+  }
+  function closeCandidateModal() { document.getElementById('candidate-overlay').hidden = true; }
+
+  // ---------- detail modal ----------
+  let detailTarget = null;
+  function openDetail(rec, challenge) {
+    detailTarget = rec;
+    document.getElementById('detail-title').textContent = challenge.title;
+    document.getElementById('detail-cat').textContent = assets.theme.categories[challenge.category] || challenge.category;
+    const noteRow = document.getElementById('detail-note-row');
+    if (challenge.note) { noteRow.hidden = false; document.getElementById('detail-note').textContent = challenge.note; }
+    else { noteRow.hidden = true; }
+    document.getElementById('detail-dropped').textContent = rec.droppedOn;
+
+    const type = deriveType(rec);
+    const stampedRow = document.getElementById('detail-stamped-row');
+    const stampBtn = document.getElementById('stamp-action');
+    if (type === 'unstamped') {
+      stampedRow.hidden = true;
+      stampBtn.hidden = false;
+    } else {
+      stampedRow.hidden = false;
+      const cutoff = getState().settings.dayCutoffHour;
+      const label = type === 'normal'
+        ? `正常戳 · ${mmdd(dayKey(rec.stampedAt, cutoff))}`
+        : `補票戳 · 完成 ${mmdd(dayKey(rec.stampedAt, cutoff))}（掉落於 ${mmdd(rec.droppedOn)}）`;
+      document.getElementById('detail-stamped').textContent = label;
+      stampBtn.hidden = true;
+    }
+    document.getElementById('detail-overlay').hidden = false;
+  }
+  function closeDetailModal() { document.getElementById('detail-overlay').hidden = true; detailTarget = null; }
+
+  // ---------- wiring ----------
+  document.getElementById('detail-close').addEventListener('click', closeDetailModal);
+  document.getElementById('stamp-action').addEventListener('click', () => {
+    if (detailTarget) stampRecord(detailTarget.book, detailTarget.slot);
+  });
+  document.getElementById('prev-book').addEventListener('click', () => { if (viewBook > 1) { viewBook--; render(); } });
+  document.getElementById('next-book').addEventListener('click', () => { if (viewBook < maxBook()) { viewBook++; render(); } });
+
+  // ---------- boot ----------
+  (async function boot() {
+    await loadThemePack();
+    ensureSeed();
+    maybeDrop();
+    viewBook = getState().book;
+    render();
+    const state = getState();
+    if (viewBook === state.book && state.pendingDrop) openCandidateModal();
+  })();
+})();
+</script>
+</body>
+</html>

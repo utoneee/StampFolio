@@ -1,0 +1,41 @@
+<svg viewBox="0 0 240 320" xmlns="http://www.w3.org/2000/svg">
+  <!-- 郵票框基底 v1：齒孔邊 3:4 直式，圖樣區 + 標題帶。id 為引擎裝票的掛鉤，換皮時保留 id 即可。 -->
+  <defs>
+    <mask id="perf">
+      <rect x="0" y="0" width="240" height="320" fill="white"/>
+      <!-- 齒孔：r=7，間距 24，四邊 -->
+      <g fill="black">
+        <!-- 上邊 -->
+        <circle cx="0" cy="0" r="7"/><circle cx="24" cy="0" r="7"/><circle cx="48" cy="0" r="7"/><circle cx="72" cy="0" r="7"/><circle cx="96" cy="0" r="7"/><circle cx="120" cy="0" r="7"/><circle cx="144" cy="0" r="7"/><circle cx="168" cy="0" r="7"/><circle cx="192" cy="0" r="7"/><circle cx="216" cy="0" r="7"/><circle cx="240" cy="0" r="7"/>
+        <!-- 下邊 -->
+        <circle cx="0" cy="320" r="7"/><circle cx="24" cy="320" r="7"/><circle cx="48" cy="320" r="7"/><circle cx="72" cy="320" r="7"/><circle cx="96" cy="320" r="7"/><circle cx="120" cy="320" r="7"/><circle cx="144" cy="320" r="7"/><circle cx="168" cy="320" r="7"/><circle cx="192" cy="320" r="7"/><circle cx="216" cy="320" r="7"/><circle cx="240" cy="320" r="7"/>
+        <!-- 左邊 -->
+        <circle cx="0" cy="26.7" r="7"/><circle cx="0" cy="53.3" r="7"/><circle cx="0" cy="80" r="7"/><circle cx="0" cy="106.7" r="7"/><circle cx="0" cy="133.3" r="7"/><circle cx="0" cy="160" r="7"/><circle cx="0" cy="186.7" r="7"/><circle cx="0" cy="213.3" r="7"/><circle cx="0" cy="240" r="7"/><circle cx="0" cy="266.7" r="7"/><circle cx="0" cy="293.3" r="7"/>
+        <!-- 右邊 -->
+        <circle cx="240" cy="26.7" r="7"/><circle cx="240" cy="53.3" r="7"/><circle cx="240" cy="80" r="7"/><circle cx="240" cy="106.7" r="7"/><circle cx="240" cy="133.3" r="7"/><circle cx="240" cy="160" r="7"/><circle cx="240" cy="186.7" r="7"/><circle cx="240" cy="213.3" r="7"/><circle cx="240" cy="240" r="7"/><circle cx="240" cy="266.7" r="7"/><circle cx="240" cy="293.3" r="7"/>
+      </g>
+    </mask>
+  </defs>
+
+  <!-- 票紙 -->
+  <rect x="0" y="0" width="240" height="320" fill="#EFE7D8" mask="url(#perf)"/>
+
+  <!-- 內框：雙細線 -->
+  <rect x="16" y="16" width="208" height="288" fill="none" stroke="#B8845A" stroke-width="1.5"/>
+  <rect x="21" y="21" width="198" height="278" fill="none" stroke="#B8845A" stroke-width="0.6" opacity="0.6"/>
+
+  <!-- 圖樣區（placeholder：以簡單幾何示意，正式版換手繪圖樣） -->
+  <g id="stamp-art">
+    <rect x="30" y="30" width="180" height="216" fill="#E4D9C5"/>
+    <circle cx="120" cy="120" r="52" fill="none" stroke="#B8845A" stroke-width="2"/>
+    <circle cx="120" cy="120" r="34" fill="#B8845A" opacity="0.28"/>
+    <path d="M 68 216 Q 96 180 120 200 Q 148 224 172 192" fill="none" stroke="#8A7357" stroke-width="2.5" stroke-linecap="round"/>
+  </g>
+
+  <!-- 面額角標：v1 固定顯示掉落月份 -->
+  <text id="stamp-denom" x="42" y="52" font-family="Georgia, serif" font-size="17" fill="#4A3F33">07</text>
+
+  <!-- 標題帶 -->
+  <text id="stamp-title-cn" x="120" y="272" font-family="'Noto Serif TC', serif" font-size="14" fill="#4A3F33" text-anchor="middle" letter-spacing="3">挑戰名稱</text>
+  <text id="stamp-title-en" x="120" y="291" font-family="Georgia, serif" font-size="8.5" fill="#8A7357" text-anchor="middle" letter-spacing="1.5">DAILY STAMP · 2026</text>
+</svg>
