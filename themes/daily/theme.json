@@ -3,14 +3,15 @@
   "bookTitle": "StampFolio: Daily",
   "bookLabelEn": "DAILY STAMP",
   "colors": {
-    "albumBg": "#F2ECE2",
+    "albumBg": "#E8DECB",
     "stampPaper": "#EFE7D8",
     "artBg": "#E4D9C5",
     "accent": "#B8845A",
     "accentDeep": "#8A7357",
     "ink": "#4A3F33",
     "markNormal": "#96604A",
-    "markMakeup": "#66748A"
+    "markMakeup": "#66748A",
+    "markClosing": "#B23B3B"
   },
   "categories": {
     "draw": "動筆 — 畫、寫、設計小練習",

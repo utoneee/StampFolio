@@ -6,7 +6,7 @@
 <title>StampFolio</title>
 <style>
   :root {
-    --album-bg: #F2ECE2;
+    --album-bg: #E8DECB;
     --stamp-paper: #EFE7D8;
     --art-bg: #E4D9C5;
     --accent: #B8845A;
@@ -14,6 +14,7 @@
     --ink: #4A3F33;
     --mark-normal: #96604A;
     --mark-makeup: #66748A;
+    --mark-closing: #B23B3B;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
@@ -46,6 +47,7 @@
   }
 
   .album-grid {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 12px;
@@ -54,12 +56,29 @@
     margin: 0 auto;
   }
   .stamp-card { cursor: pointer; position: relative; }
-  .receipt-card {
+  .slot-placeholder {
+    aspect-ratio: 240 / 320; border-radius: 6px; opacity: 0.4;
+    background-image: repeating-linear-gradient(to bottom, transparent 0 37px, var(--accent) 37px 38px);
+  }
+  .slot-placeholder.next { cursor: pointer; opacity: 0.65; }
+  .slot-placeholder.next:active { opacity: 0.9; }
+  .close-book-card {
     cursor: pointer; aspect-ratio: 240 / 320; border-radius: 6px;
-    border: 1.5px dashed var(--accent-deep); background: rgba(255,255,255,0.3);
+    border: 1.5px solid var(--mark-closing); background: rgba(178,59,59,0.08);
     display: flex; align-items: center; justify-content: center;
-    text-align: center; font-size: 12px; color: var(--accent-deep); padding: 10px;
-    line-height: 1.5;
+    text-align: center; font-size: 13px; color: var(--mark-closing); padding: 10px;
+    line-height: 1.6; white-space: pre-line;
+  }
+  .book-closed-stamp {
+    position: absolute; top: -8px; right: 4px; width: 104px; height: 104px;
+    border: 3px solid var(--mark-closing); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    transform: rotate(-12deg); cursor: pointer; background: rgba(255,255,255,0.2);
+    color: var(--mark-closing); font-family: Georgia, serif; font-weight: bold;
+    font-size: 19px; letter-spacing: 3px; opacity: 0.85;
+  }
+  .book-closed-stamp::before {
+    content: ''; position: absolute; inset: 6px; border: 1.5px solid var(--mark-closing); border-radius: 50%;
   }
   .stamp-card svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 2px 3px rgba(74,63,51,0.18)); }
   .stamp-card.unstamped svg .frame-art { opacity: 0.55; }
@@ -102,6 +121,7 @@
   .detail-row { font-size: 13px; margin: 6px 0; color: var(--ink); }
   .detail-row .label { color: var(--accent-deep); margin-right: 6px; }
   .receipt-comment { font-size: 13px; color: var(--ink); margin: 14px 0 4px; line-height: 1.6; }
+  .candidate-hint { font-size: 11px; color: var(--accent-deep); margin: 2px 0 10px; }
   .stamp-btn {
     margin-top: 16px; width: 100%; padding: 12px; border: none; border-radius: 10px;
     background: var(--accent); color: #fff; font-size: 15px; letter-spacing: 2px; cursor: pointer;
@@ -148,11 +168,12 @@
   <div id="pending-banner" class="pending-banner" hidden></div>
 
   <div id="album-grid" class="album-grid"></div>
-  <div id="empty-note" class="empty-note" hidden>這本還沒有任何一格，明天開 app 會掉下第一批候選。</div>
+  <div id="empty-note" class="empty-note" hidden>這本還是空的，點格子新增第一批郵票。</div>
 
   <div id="candidate-overlay" class="overlay" hidden>
     <div class="sheet">
-      <h2>今天掉下兩張，選一張貼進冊子</h2>
+      <h2>掉下兩張，選一張貼進冊子</h2>
+      <p class="candidate-hint">還沒想好？點旁邊空白處先收起來，今天再點格子還是這兩張。</p>
       <div id="candidate-list" class="candidate-list"></div>
     </div>
   </div>
@@ -194,7 +215,7 @@
 
 <script>
 (function () {
-  const APP_BUILD = '2026-07-06.4';
+  const APP_BUILD = '2026-07-07.1';
   const THEME_ID = 'daily';
   const THEME_BASE = `./themes/${THEME_ID}/`;
   const KEYS = {
@@ -304,6 +325,7 @@
     root.setProperty('--ink', colors.ink);
     root.setProperty('--mark-normal', colors.markNormal);
     root.setProperty('--mark-makeup', colors.markMakeup);
+    root.setProperty('--mark-closing', colors.markClosing);
   }
 
   // ---------- seeding ----------
@@ -340,31 +362,49 @@
     return getRecords().filter(r => r.book === book && r.stampedAt).length;
   }
 
-  // 完冊門檻＝蓋章數達 theme 設定值（非抽池抽空）。達標當下結算關閉本冊：
-  // 已貼未蓋章的格子＋池中剩餘挑戰一起計入 missedChallengeIds，本冊自此唯讀，不可再補章。
-  function closeBookIfComplete(state) {
-    const threshold = assets.theme.settings.completionStampCount || 12;
-    if (stampedCountForBook(state.book) >= threshold) {
-      const missedFromCards = getRecords()
-        .filter(r => r.book === state.book && !r.stampedAt)
-        .map(r => r.challengeId);
-      const missedChallengeIds = missedFromCards.concat(state.poolCycle);
-      const closedBooks = state.closedBooks || [];
-      closedBooks.push({ book: state.book, closedAt: now().toISOString(), missedChallengeIds });
-      state.closedBooks = closedBooks;
-      state.book += 1;
-      state.poolCycle = shuffle(getChallenges().filter(c => c.active).map(c => c.id));
-      state.pendingDrop = null;
-    }
-    return state;
+  function completionThreshold() {
+    return assets.theme.settings.completionStampCount || 12;
   }
 
-  function maybeDrop() {
+  // 蓋章數達門檻後可結束本冊，但何時結束由玩家決定（點結束卡＋確認）。
+  // 結算當下：已貼未蓋章的格子＋池中剩餘＋未擇一的候選，一起計入 missedChallengeIds，本冊自此唯讀。
+  function canCloseBook(state) {
+    return stampedCountForBook(state.book) >= completionThreshold()
+      || (state.poolCycle.length === 0 && !state.pendingDrop);
+  }
+
+  function closeBook() {
     const state = getState();
+    if (!canCloseBook(state)) return;
+    const missedFromCards = getRecords()
+      .filter(r => r.book === state.book && !r.stampedAt)
+      .map(r => r.challengeId);
+    const missedChallengeIds = missedFromCards
+      .concat(state.poolCycle)
+      .concat(state.pendingDrop ? state.pendingDrop.ids : []);
+    const closedBooks = state.closedBooks || [];
+    closedBooks.push({ book: state.book, closedAt: now().toISOString(), missedChallengeIds });
+    state.closedBooks = closedBooks;
+    state.book += 1;
+    state.poolCycle = shuffle(getChallenges().filter(c => c.active).map(c => c.id));
+    state.pendingDrop = null;
+    saveState(state);
+    viewBook = state.book;
+    render();
+    toast('這本結算完成，翻開新的一本');
+  }
+
+  function confirmCloseBook() {
+    if (confirm('結束這一本並結算？結束後這本不能再蓋章，未完成的挑戰會列入收據。')) closeBook();
+  }
+
+  // 掉落改為手動：點下一格的空格觸發。每日仍限一次；當天再點回到同一組候選。
+  function requestDrop() {
+    const state = getState();
+    if (state.pendingDrop) { openCandidateModal(); return; }
     const today = dayKey(now(), state.settings.dayCutoffHour);
-    if (state.pendingDrop) return; // 有待選，先不掉新落
-    if (state.lastDropDayKey === today) return; // 今天掉過了
-    if (state.poolCycle.length === 0) return; // 理論上不會發生（完冊即重建）
+    if (state.lastDropDayKey === today) { toast('今天已經領過郵票了，明天再來'); return; }
+    if (state.poolCycle.length === 0) { toast('這本的挑戰池空了，可以結束本冊'); return; }
 
     if (state.poolCycle.length === 1) {
       const id = state.poolCycle.pop();
@@ -375,7 +415,8 @@
       const records = getRecords(); records.push(rec); saveRecords(records);
       state.lastDropDayKey = today;
       saveState(state);
-      toast('池裡只剩最後一張，直接貼進本冊最後一格');
+      render();
+      toast('池裡只剩最後一張，直接貼進格子');
     } else {
       const idxA = Math.floor(Math.random() * state.poolCycle.length);
       let idxB = Math.floor(Math.random() * (state.poolCycle.length - 1));
@@ -385,6 +426,8 @@
       state.pendingDrop = { droppedOn: today, ids: [idA, idB] };
       state.lastDropDayKey = today;
       saveState(state);
+      render();
+      openCandidateModal();
     }
   }
 
@@ -412,16 +455,8 @@
     if (!rec || rec.stampedAt) return;
     rec.stampedAt = now().toISOString();
     saveRecords(records);
-    const bookBeforeClose = state.book;
-    closeBookIfComplete(state);
-    saveState(state);
     closeDetailModal();
-    if (state.book !== bookBeforeClose) {
-      viewBook = state.book;
-      render();
-    } else {
-      render(`${book}-${slot}`);
-    }
+    render(`${book}-${slot}`);
   }
 
   // ---------- view state ----------
@@ -502,18 +537,40 @@
 
     const closedInfo = (state.closedBooks || []).find(c => c.book === viewBook);
     if (closedInfo) {
-      const card = document.createElement('div');
-      card.className = 'receipt-card';
-      card.textContent = '本冊收據\n點擊查看';
-      card.style.whiteSpace = 'pre-line';
-      card.addEventListener('click', () => openReceipt(closedInfo));
-      grid.appendChild(card);
+      // 已結算的本冊：右上角蓋一枚結算大郵戳，點戳看收據
+      const stamp = document.createElement('div');
+      stamp.className = 'book-closed-stamp';
+      stamp.textContent = 'END';
+      stamp.title = '點擊查看本冊收據';
+      stamp.addEventListener('click', () => openReceipt(closedInfo));
+      grid.appendChild(stamp);
+    } else if (viewBook === state.book) {
+      // 遊玩中的本冊：未貼格畫橫線佔位到門檻數，下一格可點領票
+      const total = Math.max(completionThreshold(), records.length + 1);
+      const canDraw = state.poolCycle.length > 0 || state.pendingDrop;
+      for (let i = records.length + 1; i <= total; i++) {
+        const ph = document.createElement('div');
+        ph.className = 'slot-placeholder';
+        if (i === records.length + 1 && canDraw) {
+          ph.classList.add('next');
+          ph.title = '點擊新增郵票';
+          ph.addEventListener('click', requestDrop);
+        }
+        grid.appendChild(ph);
+      }
+      if (canCloseBook(state)) {
+        const card = document.createElement('div');
+        card.className = 'close-book-card';
+        card.textContent = '已達成換本條件\n結束此本\n開啟新的一本';
+        card.addEventListener('click', confirmCloseBook);
+        grid.appendChild(card);
+      }
     }
 
     const banner = document.getElementById('pending-banner');
     if (viewBook === state.book && state.pendingDrop) {
       banner.hidden = false;
-      banner.textContent = '今天掉下新的候選，點這裡選一張貼進冊子';
+      banner.textContent = '有一組候選還沒選，點這裡選一張貼進冊子';
       banner.onclick = openCandidateModal;
     } else {
       banner.hidden = true;
@@ -607,6 +664,10 @@
   });
   document.getElementById('prev-book').addEventListener('click', () => { if (viewBook > 1) { viewBook--; render(); } });
   document.getElementById('next-book').addEventListener('click', () => { if (viewBook < maxBook()) { viewBook++; render(); } });
+  // 點候選彈窗外的空白處＝先不選，收起彈窗（pendingDrop 保留，當天再點格子回到同一組）
+  document.getElementById('candidate-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeCandidateModal();
+  });
 
   // ---------- debug panel（僅 URL 帶 ?debug=1 時出現，測試用：清空重置／模擬換日） ----------
   function setupDebugPanel() {
@@ -636,12 +697,9 @@
     document.getElementById('build-tag').textContent = APP_BUILD;
     await loadThemePack();
     ensureSeed();
-    maybeDrop();
     viewBook = getState().book;
     render();
     setupDebugPanel();
-    const state = getState();
-    if (viewBook === state.book && state.pendingDrop) openCandidateModal();
   })();
 })();
 </script>
