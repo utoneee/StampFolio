@@ -6,7 +6,7 @@
 <title>StampFolio</title>
 <style>
   :root {
-    --album-bg: #E8DECB;
+    --album-bg: #DACBAC;
     --stamp-paper: #EFE7D8;
     --art-bg: #E4D9C5;
     --accent: #B8845A;
@@ -57,11 +57,19 @@
   }
   .stamp-card { cursor: pointer; position: relative; }
   .slot-placeholder {
-    aspect-ratio: 240 / 320; border-radius: 6px; opacity: 0.4;
-    background-image: repeating-linear-gradient(to bottom, transparent 0 37px, var(--accent) 37px 38px);
+    aspect-ratio: 240 / 320; border-radius: 6px;
+    border: 1.5px dashed rgba(138,115,87,0.45);
   }
-  .slot-placeholder.next { cursor: pointer; opacity: 0.65; }
-  .slot-placeholder.next:active { opacity: 0.9; }
+  .slot-next-btn { cursor: pointer; position: relative; }
+  .slot-next-btn svg {
+    width: 100%; height: auto; display: block;
+    filter: grayscale(1) opacity(0.45);
+  }
+  .slot-next-btn:active svg { filter: grayscale(1) opacity(0.7); }
+  .slot-next-btn .plus {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 44px; font-weight: 300; color: var(--accent-deep); opacity: 0.75; pointer-events: none;
+  }
   .close-book-card {
     cursor: pointer; aspect-ratio: 240 / 320; border-radius: 6px;
     border: 1.5px solid var(--mark-closing); background: rgba(178,59,59,0.08);
@@ -110,8 +118,39 @@
   .sheet h2 { margin: 0 0 12px; font-size: 16px; letter-spacing: 1px; }
   .candidate-list { display: flex; gap: 12px; }
   .candidate-card {
-    flex: 1; border: 1.5px solid var(--accent); border-radius: 12px; padding: 14px 10px;
+    flex: 1; border: 1.5px solid var(--accent); border-radius: 12px; padding: 12px 10px;
     text-align: center; cursor: pointer; background: rgba(255,255,255,0.35);
+  }
+  .candidate-card svg { width: 100%; height: auto; display: block; margin-bottom: 8px; }
+
+  /* zoom + flip（點郵票放大，再點翻面，點空白處退回） */
+  .zoom-overlay {
+    position: fixed; inset: 0; background: rgba(74,63,51,0.55);
+    display: flex; flex-direction: column; gap: 18px;
+    align-items: center; justify-content: center;
+    padding: 24px; z-index: 25; perspective: 1200px;
+  }
+  .zoom-overlay[hidden] { display: none; }
+  .zoom-flip {
+    width: min(76vw, 340px); aspect-ratio: 240 / 320; position: relative;
+    transform-style: preserve-3d; transition: transform 0.45s ease; cursor: pointer;
+  }
+  .zoom-flip.flipped { transform: rotateY(180deg); }
+  .zoom-face {
+    position: absolute; inset: 0;
+    backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  }
+  .zoom-front svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 8px 20px rgba(74,63,51,0.4)); }
+  .zoom-back {
+    transform: rotateY(180deg);
+    background: var(--stamp-paper); border-radius: 10px; padding: 20px 16px;
+    display: flex; flex-direction: column; overflow-y: auto;
+    box-shadow: 0 8px 20px rgba(74,63,51,0.4);
+  }
+  .zoom-back h3 { margin: 0 0 10px; font-size: 17px; letter-spacing: 1px; color: var(--ink); }
+  .zoom-hint {
+    text-align: center; font-size: 12px;
+    color: rgba(242,236,226,0.85); pointer-events: none;
   }
   .candidate-card:active { background: rgba(184,132,90,0.25); }
   .candidate-card .cat { font-size: 11px; color: var(--accent-deep); margin-bottom: 6px; }
@@ -178,16 +217,19 @@
     </div>
   </div>
 
-  <div id="detail-overlay" class="overlay" hidden>
-    <div class="sheet">
-      <h2 id="detail-title"></h2>
-      <div class="detail-row"><span class="label">分類</span><span id="detail-cat"></span></div>
-      <div class="detail-row" id="detail-note-row"><span class="label">備註</span><span id="detail-note"></span></div>
-      <div class="detail-row"><span class="label">掉落日</span><span id="detail-dropped"></span></div>
-      <div class="detail-row" id="detail-stamped-row" hidden><span class="label">戳面</span><span id="detail-stamped"></span></div>
-      <button id="stamp-action" class="stamp-btn" hidden>蓋 章</button>
-      <button id="detail-close" class="close-btn">關閉</button>
+  <div id="zoom-overlay" class="zoom-overlay" hidden>
+    <div id="zoom-flip" class="zoom-flip">
+      <div id="zoom-front" class="zoom-face zoom-front"></div>
+      <div class="zoom-face zoom-back">
+        <h3 id="detail-title"></h3>
+        <div class="detail-row"><span class="label">分類</span><span id="detail-cat"></span></div>
+        <div class="detail-row" id="detail-note-row"><span class="label">備註</span><span id="detail-note"></span></div>
+        <div class="detail-row"><span class="label">掉落日</span><span id="detail-dropped"></span></div>
+        <div class="detail-row" id="detail-stamped-row" hidden><span class="label">戳面</span><span id="detail-stamped"></span></div>
+        <button id="stamp-action" class="stamp-btn" hidden>蓋 章</button>
+      </div>
     </div>
+    <div class="zoom-hint">點郵票翻面．點旁邊空白處回到冊子</div>
   </div>
 
   <div id="receipt-overlay" class="overlay" hidden>
@@ -215,7 +257,7 @@
 
 <script>
 (function () {
-  const APP_BUILD = '2026-07-07.1';
+  const APP_BUILD = '2026-07-07.2';
   const THEME_ID = 'daily';
   const THEME_BASE = `./themes/${THEME_ID}/`;
   const KEYS = {
@@ -455,7 +497,7 @@
     if (!rec || rec.stampedAt) return;
     rec.stampedAt = now().toISOString();
     saveRecords(records);
-    closeDetailModal();
+    closeZoom();
     render(`${book}-${slot}`);
   }
 
@@ -508,6 +550,16 @@
     return svg;
   }
 
+  // 灰色郵票剪影（新增郵票按鈕用）：拿票框 SVG 清空文字，配 CSS grayscale
+  function buildSilhouetteSvg() {
+    const svg = instantiate(assets.frameSvgText, 'perf', 'next-slot');
+    ['#stamp-denom', '#stamp-title-cn', '#stamp-title-en'].forEach(sel => {
+      const el = svg.querySelector(sel);
+      if (el) el.textContent = '';
+    });
+    return svg;
+  }
+
   function render(justStampedKey) {
     const state = getState();
     const records = getRecords().filter(r => r.book === viewBook).sort((a, b) => a.slot - b.slot);
@@ -531,7 +583,7 @@
       card.className = 'stamp-card ' + (type === 'unstamped' ? 'unstamped' : 'stamped');
       if (justStampedKey === suffix) card.classList.add('just-stamped');
       card.appendChild(svg);
-      card.addEventListener('click', () => openDetail(rec, challenge));
+      card.addEventListener('click', () => openZoom(rec, challenge));
       grid.appendChild(card);
     });
 
@@ -545,16 +597,24 @@
       stamp.addEventListener('click', () => openReceipt(closedInfo));
       grid.appendChild(stamp);
     } else if (viewBook === state.book) {
-      // 遊玩中的本冊：未貼格畫橫線佔位到門檻數，下一格可點領票
+      // 遊玩中的本冊：下一格＝灰色郵票剪影按鈕（點擊領票），其後的未來格＝空框
       const total = Math.max(completionThreshold(), records.length + 1);
       const canDraw = state.poolCycle.length > 0 || state.pendingDrop;
       for (let i = records.length + 1; i <= total; i++) {
-        const ph = document.createElement('div');
-        ph.className = 'slot-placeholder';
+        let ph;
         if (i === records.length + 1 && canDraw) {
-          ph.classList.add('next');
+          ph = document.createElement('div');
+          ph.className = 'slot-next-btn';
           ph.title = '點擊新增郵票';
+          ph.appendChild(buildSilhouetteSvg());
+          const plus = document.createElement('div');
+          plus.className = 'plus';
+          plus.textContent = '＋';
+          ph.appendChild(plus);
           ph.addEventListener('click', requestDrop);
+        } else {
+          ph = document.createElement('div');
+          ph.className = 'slot-placeholder';
         }
         grid.appendChild(ph);
       }
@@ -590,11 +650,19 @@
       if (!c) return;
       const card = document.createElement('div');
       card.className = 'candidate-card';
-      card.innerHTML = `
+      // 候選卡帶郵票預覽：用掉落日＋無戳狀態組一張未貼票（圖樣現為 placeholder，換真圖後自動吃到）
+      const preview = buildFrameSvg(
+        { book: state.book, slot: 0, droppedOn: state.pendingDrop.droppedOn, stampedAt: null },
+        c, `cand-${id}`
+      );
+      card.appendChild(preview);
+      const info = document.createElement('div');
+      info.innerHTML = `
         <div class="cat">${assets.theme.categories[c.category] || c.category}</div>
         <div class="title">${c.title}</div>
         <div class="note">${c.note || ''}</div>
       `;
+      card.appendChild(info);
       card.addEventListener('click', () => chooseCandidate(id));
       list.appendChild(card);
     });
@@ -602,10 +670,14 @@
   }
   function closeCandidateModal() { document.getElementById('candidate-overlay').hidden = true; }
 
-  // ---------- detail modal ----------
+  // ---------- zoom + flip（點郵票放大 → 再點翻面看資訊 → 點空白處退回） ----------
   let detailTarget = null;
-  function openDetail(rec, challenge) {
+  function openZoom(rec, challenge) {
     detailTarget = rec;
+    const front = document.getElementById('zoom-front');
+    front.innerHTML = '';
+    front.appendChild(buildFrameSvg(rec, challenge, `zoom-${rec.book}-${rec.slot}`));
+
     document.getElementById('detail-title').textContent = challenge.title;
     document.getElementById('detail-cat').textContent = assets.theme.categories[challenge.category] || challenge.category;
     const noteRow = document.getElementById('detail-note-row');
@@ -629,9 +701,10 @@
       document.getElementById('detail-stamped').textContent = label;
       stampBtn.hidden = true;
     }
-    document.getElementById('detail-overlay').hidden = false;
+    document.getElementById('zoom-flip').classList.remove('flipped');
+    document.getElementById('zoom-overlay').hidden = false;
   }
-  function closeDetailModal() { document.getElementById('detail-overlay').hidden = true; detailTarget = null; }
+  function closeZoom() { document.getElementById('zoom-overlay').hidden = true; detailTarget = null; }
 
   // ---------- receipt modal ----------
   // 評語文字為暫訂分級，之後再細調（用戶已知會回頭調整）
@@ -657,10 +730,17 @@
   function closeReceiptModal() { document.getElementById('receipt-overlay').hidden = true; }
 
   // ---------- wiring ----------
-  document.getElementById('detail-close').addEventListener('click', closeDetailModal);
   document.getElementById('receipt-close').addEventListener('click', closeReceiptModal);
-  document.getElementById('stamp-action').addEventListener('click', () => {
+  // 放大卡：點卡片翻面；蓋章按鈕不觸發翻面；點 overlay 空白處退回冊子
+  document.getElementById('zoom-flip').addEventListener('click', () => {
+    document.getElementById('zoom-flip').classList.toggle('flipped');
+  });
+  document.getElementById('stamp-action').addEventListener('click', (e) => {
+    e.stopPropagation();
     if (detailTarget) stampRecord(detailTarget.book, detailTarget.slot);
+  });
+  document.getElementById('zoom-overlay').addEventListener('click', (e) => {
+    if (e.target === e.currentTarget) closeZoom();
   });
   document.getElementById('prev-book').addEventListener('click', () => { if (viewBook > 1) { viewBook--; render(); } });
   document.getElementById('next-book').addEventListener('click', () => { if (viewBook < maxBook()) { viewBook++; render(); } });
