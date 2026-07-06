@@ -47,7 +47,7 @@
 
   .album-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
     gap: 12px;
     padding: 16px;
     max-width: 720px;
@@ -64,6 +64,11 @@
   }
 
   .empty-note { max-width: 720px; margin: 40px auto; text-align: center; color: var(--accent-deep); font-size: 14px; padding: 0 24px; }
+
+  .build-tag {
+    position: fixed; left: 8px; bottom: 6px; font-size: 10px;
+    color: var(--accent-deep); opacity: 0.4; pointer-events: none; z-index: 50;
+  }
 
   /* modals */
   .overlay {
@@ -113,6 +118,7 @@
     border-radius: 10px; padding: 10px 12px; font-size: 12px;
     display: flex; flex-direction: column; gap: 6px; max-width: 200px;
   }
+  .debug-panel[hidden] { display: none; }
   .debug-row { display: flex; gap: 6px; }
   .debug-panel button {
     flex: 1; font-size: 11px; padding: 6px 8px; border-radius: 6px; border: none;
@@ -156,6 +162,7 @@
   </div>
 
   <div id="toast" class="toast"></div>
+  <div id="build-tag" class="build-tag"></div>
 
   <div id="debug-panel" class="debug-panel" hidden>
     <div id="debug-offset-label">模擬日期偏移：+0 天</div>
@@ -168,6 +175,7 @@
 
 <script>
 (function () {
+  const APP_BUILD = '2026-07-06.3';
   const THEME_ID = 'daily';
   const THEME_BASE = `./themes/${THEME_ID}/`;
   const KEYS = {
@@ -548,6 +556,7 @@
 
   // ---------- boot ----------
   (async function boot() {
+    document.getElementById('build-tag').textContent = APP_BUILD;
     await loadThemePack();
     ensureSeed();
     maybeDrop();
