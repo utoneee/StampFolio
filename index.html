@@ -54,6 +54,13 @@
     margin: 0 auto;
   }
   .stamp-card { cursor: pointer; position: relative; }
+  .receipt-card {
+    cursor: pointer; aspect-ratio: 240 / 320; border-radius: 6px;
+    border: 1.5px dashed var(--accent-deep); background: rgba(255,255,255,0.3);
+    display: flex; align-items: center; justify-content: center;
+    text-align: center; font-size: 12px; color: var(--accent-deep); padding: 10px;
+    line-height: 1.5;
+  }
   .stamp-card svg { width: 100%; height: auto; display: block; filter: drop-shadow(0 2px 3px rgba(74,63,51,0.18)); }
   .stamp-card.unstamped svg .frame-art { opacity: 0.55; }
   .stamp-card.just-stamped { animation: stampPop 0.32s ease-out; }
@@ -94,6 +101,7 @@
 
   .detail-row { font-size: 13px; margin: 6px 0; color: var(--ink); }
   .detail-row .label { color: var(--accent-deep); margin-right: 6px; }
+  .receipt-comment { font-size: 13px; color: var(--ink); margin: 14px 0 4px; line-height: 1.6; }
   .stamp-btn {
     margin-top: 16px; width: 100%; padding: 12px; border: none; border-radius: 10px;
     background: var(--accent); color: #fff; font-size: 15px; letter-spacing: 2px; cursor: pointer;
@@ -161,6 +169,17 @@
     </div>
   </div>
 
+  <div id="receipt-overlay" class="overlay" hidden>
+    <div class="sheet">
+      <h2>本冊收據 · 第 <span id="receipt-book"></span> 本</h2>
+      <div class="detail-row"><span class="label">蓋章數</span><span id="receipt-stamped"></span></div>
+      <div class="detail-row"><span class="label">正常戳／補票戳</span><span id="receipt-ratio"></span></div>
+      <div class="detail-row"><span class="label">錯過</span><span id="receipt-missed"></span></div>
+      <p id="receipt-comment" class="receipt-comment"></p>
+      <button id="receipt-close" class="close-btn">關閉</button>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
   <div id="build-tag" class="build-tag"></div>
 
@@ -175,7 +194,7 @@
 
 <script>
 (function () {
-  const APP_BUILD = '2026-07-06.3';
+  const APP_BUILD = '2026-07-06.4';
   const THEME_ID = 'daily';
   const THEME_BASE = `./themes/${THEME_ID}/`;
   const KEYS = {
@@ -299,6 +318,7 @@
         poolCycle: ids,
         lastDropDayKey: null,
         pendingDrop: null,
+        closedBooks: [],
         settings: { dayCutoffHour: assets.theme.settings.dayCutoffHour }
       });
     }
@@ -316,11 +336,25 @@
   }
 
   // ---------- drop / choose / stamp / completion ----------
-  function checkBookCompletion(state) {
-    if (state.poolCycle.length === 0 && !state.pendingDrop) {
+  function stampedCountForBook(book) {
+    return getRecords().filter(r => r.book === book && r.stampedAt).length;
+  }
+
+  // 完冊門檻＝蓋章數達 theme 設定值（非抽池抽空）。達標當下結算關閉本冊：
+  // 已貼未蓋章的格子＋池中剩餘挑戰一起計入 missedChallengeIds，本冊自此唯讀，不可再補章。
+  function closeBookIfComplete(state) {
+    const threshold = assets.theme.settings.completionStampCount || 12;
+    if (stampedCountForBook(state.book) >= threshold) {
+      const missedFromCards = getRecords()
+        .filter(r => r.book === state.book && !r.stampedAt)
+        .map(r => r.challengeId);
+      const missedChallengeIds = missedFromCards.concat(state.poolCycle);
+      const closedBooks = state.closedBooks || [];
+      closedBooks.push({ book: state.book, closedAt: now().toISOString(), missedChallengeIds });
+      state.closedBooks = closedBooks;
       state.book += 1;
       state.poolCycle = shuffle(getChallenges().filter(c => c.active).map(c => c.id));
-      toast('這本集郵冊完成了，翻開新的一本');
+      state.pendingDrop = null;
     }
     return state;
   }
@@ -340,7 +374,6 @@
       };
       const records = getRecords(); records.push(rec); saveRecords(records);
       state.lastDropDayKey = today;
-      checkBookCompletion(state);
       saveState(state);
       toast('池裡只剩最後一張，直接貼進本冊最後一格');
     } else {
@@ -366,20 +399,29 @@
     };
     const records = getRecords(); records.push(rec); saveRecords(records);
     state.pendingDrop = null;
-    checkBookCompletion(state);
     saveState(state);
     closeCandidateModal();
     render();
   }
 
   function stampRecord(book, slot) {
+    const state = getState();
+    if (book !== state.book) return; // 已結算關閉的本冊唯讀，不可再蓋章
     const records = getRecords();
     const rec = records.find(r => r.book === book && r.slot === slot);
     if (!rec || rec.stampedAt) return;
     rec.stampedAt = now().toISOString();
     saveRecords(records);
+    const bookBeforeClose = state.book;
+    closeBookIfComplete(state);
+    saveState(state);
     closeDetailModal();
-    render(`${book}-${slot}`);
+    if (state.book !== bookBeforeClose) {
+      viewBook = state.book;
+      render();
+    } else {
+      render(`${book}-${slot}`);
+    }
   }
 
   // ---------- view state ----------
@@ -458,6 +500,16 @@
       grid.appendChild(card);
     });
 
+    const closedInfo = (state.closedBooks || []).find(c => c.book === viewBook);
+    if (closedInfo) {
+      const card = document.createElement('div');
+      card.className = 'receipt-card';
+      card.textContent = '本冊收據\n點擊查看';
+      card.style.whiteSpace = 'pre-line';
+      card.addEventListener('click', () => openReceipt(closedInfo));
+      grid.appendChild(card);
+    }
+
     const banner = document.getElementById('pending-banner');
     if (viewBook === state.book && state.pendingDrop) {
       banner.hidden = false;
@@ -505,11 +557,12 @@
     document.getElementById('detail-dropped').textContent = rec.droppedOn;
 
     const type = deriveType(rec);
+    const isCurrentBook = rec.book === getState().book;
     const stampedRow = document.getElementById('detail-stamped-row');
     const stampBtn = document.getElementById('stamp-action');
     if (type === 'unstamped') {
       stampedRow.hidden = true;
-      stampBtn.hidden = false;
+      stampBtn.hidden = !isCurrentBook;
     } else {
       stampedRow.hidden = false;
       const cutoff = getState().settings.dayCutoffHour;
@@ -523,8 +576,32 @@
   }
   function closeDetailModal() { document.getElementById('detail-overlay').hidden = true; detailTarget = null; }
 
+  // ---------- receipt modal ----------
+  // 評語文字為暫訂分級，之後再細調（用戶已知會回頭調整）
+  function receiptComment(normalCount, makeupCount) {
+    const total = normalCount + makeupCount;
+    const ratio = total ? makeupCount / total : 0;
+    if (ratio === 0) return '這本全勤，每張都準時蓋章。';
+    if (ratio < 0.34) return '大多準時，偶爾補一下也很棒。';
+    if (ratio < 0.67) return '補票戳跟正常戳打平，隨性但都完成了。';
+    return '這本幾乎都是補票戳，也是一種完成的方式。';
+  }
+  function openReceipt(closedInfo) {
+    const bookRecords = getRecords().filter(r => r.book === closedInfo.book && r.stampedAt);
+    const normalCount = bookRecords.filter(r => deriveType(r) === 'normal').length;
+    const makeupCount = bookRecords.filter(r => deriveType(r) === 'makeup').length;
+    document.getElementById('receipt-book').textContent = closedInfo.book;
+    document.getElementById('receipt-stamped').textContent = `${bookRecords.length} 章`;
+    document.getElementById('receipt-ratio').textContent = `${normalCount} / ${makeupCount}`;
+    document.getElementById('receipt-missed').textContent = `${closedInfo.missedChallengeIds.length} 個挑戰`;
+    document.getElementById('receipt-comment').textContent = receiptComment(normalCount, makeupCount);
+    document.getElementById('receipt-overlay').hidden = false;
+  }
+  function closeReceiptModal() { document.getElementById('receipt-overlay').hidden = true; }
+
   // ---------- wiring ----------
   document.getElementById('detail-close').addEventListener('click', closeDetailModal);
+  document.getElementById('receipt-close').addEventListener('click', closeReceiptModal);
   document.getElementById('stamp-action').addEventListener('click', () => {
     if (detailTarget) stampRecord(detailTarget.book, detailTarget.slot);
   });

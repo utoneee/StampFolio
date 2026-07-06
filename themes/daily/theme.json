@@ -20,6 +20,7 @@
     "mind": "心神 — 抽牌、整理、反思"
   },
   "settings": {
-    "dayCutoffHour": 0
+    "dayCutoffHour": 0,
+    "completionStampCount": 12
   }
 }
